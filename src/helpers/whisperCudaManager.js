@@ -24,8 +24,8 @@ const PLATFORM_BINARY_NAMES = {
 };
 
 const PLATFORM_ASSET_NAMES = {
-  linux: "whisper-server-linux-x64-cuda.zip",
-  win32: "whisper-server-win32-x64-cuda.zip",
+  linux: ["whisper-cpp-linux-x64-cuda.zip", "whisper-server-linux-x64-cuda.zip"],
+  win32: ["whisper-cpp-win32-x64-cuda.zip", "whisper-server-win32-x64-cuda.zip"],
 };
 
 const COMPANION_PATTERNS = {
@@ -76,11 +76,13 @@ class WhisperCudaManager {
     const release = await fetchJson(GITHUB_RELEASE_URL, {
       headers: { Accept: "application/vnd.github+json" },
     });
-    const assetName = PLATFORM_ASSET_NAMES[process.platform];
-    const asset = release.assets?.find((a) => a.name === assetName);
+    const assetNames = PLATFORM_ASSET_NAMES[process.platform];
+    const asset = release.assets?.find((a) => assetNames.includes(a.name));
 
     if (!asset) {
-      throw new Error(`No CUDA asset found for ${process.platform} (expected ${assetName})`);
+      throw new Error(
+        `No CUDA asset found for ${process.platform} (expected ${assetNames.join(" or ")})`
+      );
     }
 
     return {

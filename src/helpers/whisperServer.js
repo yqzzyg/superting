@@ -3,6 +3,7 @@ const EventEmitter = require("events");
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
+const net = require("net");
 const { app } = require("electron");
 const debugLogger = require("./debugLogger");
 const { killProcess } = require("../utils/process");
@@ -275,7 +276,28 @@ class WhisperServerManager extends EventEmitter {
     for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
       if (await isPortAvailable(port)) return port;
     }
-    throw new Error(`No available ports in range ${PORT_RANGE_START}-${PORT_RANGE_END}`);
+
+    debugLogger.warn("Whisper preferred port range unavailable; using an ephemeral port", {
+      range: `${PORT_RANGE_START}-${PORT_RANGE_END}`,
+    });
+
+    return new Promise((resolve, reject) => {
+      const server = net.createServer();
+      server.unref();
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          server.close();
+          reject(new Error("Failed to allocate an ephemeral port"));
+          return;
+        }
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve(address.port);
+        });
+      });
+    });
   }
 
   async start(modelPath, options = {}) {
