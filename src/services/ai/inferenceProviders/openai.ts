@@ -6,9 +6,27 @@ import { withRetry, createApiRetryStrategy } from "../../../utils/retry";
 import logger from "../../../utils/logger";
 import { getConfiguredOpenAIBase } from "../openaiBase";
 import { applyThinkingSuppression } from "../thinkingSuppression";
-import openAiCompatibleErrors from "../openaiCompatibleErrors.js";
 
-const { formatOpenAiCompatibleError } = openAiCompatibleErrors;
+// `openaiCompatibleErrors.js` is a CommonJS module (consumed by the Node-side
+// test suite via require). Vite 8 serves files under src/ as native ESM, so a
+// default import from it throws "does not provide an export named 'default'"
+// and breaks the whole renderer module graph (blank window). Keep the logic
+// local until that shared module is migrated to ESM.
+function formatOpenAiCompatibleError({
+  status,
+  fallbackMessage,
+  isCustomProvider,
+}: {
+  status?: number;
+  fallbackMessage: string;
+  isCustomProvider?: boolean;
+}): string {
+  if (isCustomProvider && status === 401) {
+    return "Custom provider authentication failed (401). Check the custom endpoint API key and make sure it belongs to that provider.";
+  }
+
+  return fallbackMessage;
+}
 
 const OPENAI_ENDPOINT_PREF_STORAGE_KEY = "openAiEndpointPreference";
 const REQUEST_TIMEOUT_MS = 90_000;
