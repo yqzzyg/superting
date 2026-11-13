@@ -25,6 +25,7 @@ import {
 import ControlPanelSidebar, { type ControlPanelView } from "./ControlPanelSidebar";
 import MeetingRecordingMount from "./MeetingRecordingMount";
 import MeetingRecordingPill from "./notes/MeetingRecordingPill";
+import WindowControls from "./WindowControls";
 import { cn } from "./lib/utils";
 
 import { getCachedPlatform } from "../utils/platform";
@@ -769,6 +770,19 @@ export default function ControlPanel() {
           )}
         </div>
         <main className="min-w-0 flex-1 flex flex-col overflow-hidden bg-background">
+          {/* Frameless windows on Windows/Linux need custom window controls. macOS keeps
+              the native traffic lights via titleBarStyle: "hiddenInset". */}
+          {platform !== "darwin" && (
+            <div
+              data-window-drag-region
+              className="flex h-10 w-full shrink-0 items-center justify-end bg-background"
+              style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+            >
+              <div className="pr-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+                <WindowControls />
+              </div>
+            </div>
+          )}
           <div
             className={cn("min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background", "p-0")}
           >

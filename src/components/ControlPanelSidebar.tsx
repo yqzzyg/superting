@@ -78,6 +78,7 @@ export default function ControlPanelSidebar({
     return (
       <div className="ow-surface-pane w-[4.5rem] h-full shrink-0 flex flex-col items-center">
         <div
+          data-window-drag-region
           className="w-full h-10 shrink-0"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         />
@@ -174,11 +175,13 @@ export default function ControlPanelSidebar({
   return (
     <div className="ow-surface-pane h-full w-full shrink-0 flex flex-col">
       <div
+        data-window-drag-region
         className="w-full h-10 shrink-0"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       />
 
       <div
+        data-window-drag-region
         className="flex items-center justify-between gap-2 min-w-0 px-5 pb-4"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >

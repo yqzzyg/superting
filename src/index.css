@@ -1621,3 +1621,22 @@ body:has(.agent-overlay-window) #root {
 .dark .rich-text-editor-content p.is-editor-empty:first-child::before {
   color: oklch(0.7 0 0 / 0.2);
 }
+
+/* Frameless Electron windows (Windows/Linux): -webkit-app-region: drag
+   rectangles are hit-tested by the OS before DOM z-index is considered. A
+   modal overlapping one of those rectangles loses its pointer presses to a
+   window drag, which only happens while the window is restored (Windows does
+   not drag maximized windows). Dialogs must always opt out of dragging. */
+[role="dialog"],
+[role="alertdialog"] {
+  -webkit-app-region: no-drag;
+}
+
+/* While a modal is open, also suspend the known top-of-window drag strips so
+   they cannot swallow clicks even when Electron's region subtraction misses. */
+body:has([role="dialog"]) [data-window-drag-region],
+body:has([role="dialog"]) .ow-page-header,
+body:has([role="alertdialog"]) [data-window-drag-region],
+body:has([role="alertdialog"]) .ow-page-header {
+  -webkit-app-region: no-drag !important;
+}

@@ -102,15 +102,22 @@ export default function SidebarModal<T extends string>({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay
+          className="fixed inset-0 z-50 bg-black/45 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        />
         <DialogPrimitive.Content
           onEscapeKeyDown={(e) => {
             if (document.querySelector("[data-capturing]")) e.preventDefault();
           }}
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           className="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-4xl translate-x-[-50%] translate-y-[-50%] rounded-md p-0 overflow-hidden bg-background border border-border shadow-lg dark:bg-surface-1 dark:border-border-subtle dark:shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-98 data-[state=open]:zoom-in-98"
         >
           <div className="relative h-full max-h-[85vh] overflow-hidden">
-            <DialogPrimitive.Close className="absolute right-4 top-4 z-10 rounded-md border border-border bg-card p-1.5 text-muted-foreground shadow-sm ring-offset-background transition-colors hover:text-foreground hover:bg-muted dark:hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-1">
+            <DialogPrimitive.Close
+              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              className="absolute right-4 top-4 z-20 rounded-md border border-border bg-card p-1.5 text-muted-foreground shadow-sm ring-offset-background transition-colors hover:text-foreground hover:bg-muted dark:hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-ring/30 focus:ring-offset-1"
+            >
               <X className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="sr-only">{t("common.close")}</span>
             </DialogPrimitive.Close>
