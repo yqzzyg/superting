@@ -45,6 +45,7 @@ export const useAudioRecording = (toast, options = {}) => {
           window.electronAPI?.pauseMediaPlayback?.();
         }
         window.electronAPI?.registerCancelHotkey?.("Escape");
+
         void playStartCue();
       }
 
@@ -235,6 +236,9 @@ export const useAudioRecording = (toast, options = {}) => {
       if (getSettings().pauseMediaOnDictation) {
         window.electronAPI?.resumeMediaPlayback?.();
       }
+      // Main-process no-audio events bypass onTranscriptionComplete, so clear the
+      // preview here too; otherwise the "polishing" state can remain on screen.
+      window.electronAPI?.hideDictationPreview?.();
       toast({
         title: t("hooks.audioRecording.noAudio.title"),
         description: t("hooks.audioRecording.noAudio.description"),

@@ -85,7 +85,7 @@ export default function App() {
   const { toast, dismiss, toastCount } = useToast();
   const { t } = useTranslation();
   const { hotkey } = useHotkey();
-  const { isDragging, handleMouseDown, handleMouseUp } = useWindowDrag();
+  const { isDragging, handleMouseDown, activateDrag, handleMouseUp } = useWindowDrag();
 
   const [dragStartPos, setDragStartPos] = useState(null);
   const [hasDragged, setHasDragged] = useState(false);
@@ -391,8 +391,10 @@ export default function App() {
                       Math.pow(e.clientY - dragStartPos.y, 2)
                   );
                   if (distance > 5) {
-                    // 5px threshold for drag
+                    // 5px threshold for drag — only now start actually moving
+                    // the window; a stationary click must keep its click event.
                     setHasDragged(true);
+                    activateDrag();
                   }
                 }
               }}
