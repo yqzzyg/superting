@@ -5,6 +5,7 @@ const { net } = require("electron");
 const { execFile } = require("child_process");
 const { pipeline } = require("stream");
 const debugLogger = require("./debugLogger");
+const { variantsFor } = require("./mirror-utils");
 
 const USER_AGENT = "SuperTing/1.0";
 const PROGRESS_THROTTLE_MS = 100;
@@ -33,6 +34,25 @@ const TLS_ERROR_CODES = new Set([
   "CERT_UNTRUSTED",
 ]);
 
+// Chromium/Electron network error names that indicate a transport-level
+// failure worth retrying (possibly against a mirror) rather than a definitive
+// answer from the origin. Matched against code + message because Electron
+// often only fills in `message` ("net::ERR_CONNECTION_TIMED_OUT").
+const RETRYABLE_NET_ERRORS = [
+  "ERR_CONNECTION_TIMED_OUT",
+  "ERR_TIMED_OUT",
+  "ERR_CONNECTION_RESET",
+  "ERR_CONNECTION_CLOSED",
+  "ERR_CONNECTION_ABORTED",
+  "ERR_CONNECTION_FAILED",
+  "ERR_NAME_NOT_RESOLVED",
+  "ERR_ADDRESS_UNREACHABLE",
+  "ERR_EMPTY_RESPONSE",
+  "ERR_NETWORK_CHANGED",
+  "ERR_SOCKET_NOT_CONNECTED",
+  "ERR_SSL_PROTOCOL_ERROR",
+];
+
 function isTlsError(error) {
   return (
     TLS_ERROR_CODES.has(error.code) ||
@@ -42,7 +62,13 @@ function isTlsError(error) {
 
 function isRetryable(error) {
   if (error.isAbort || error.isHttpError || isTlsError(error)) return false;
-  return RETRYABLE_CODES.has(error.code);
+  if (RETRYABLE_CODES.has(error.code)) return true;
+  // Electron's net module (used by downloadAttempt) reports transport failures
+  // as `net::ERR_*` strings in error.message and often leaves error.code unset.
+  // Without this textual match a blocked origin is treated as a fatal error,
+  // so the retry loop never runs and the download never rotates to a mirror.
+  const text = `${error.code || ""} ${error.message || ""}`;
+  return RETRYABLE_NET_ERRORS.some((needle) => text.includes(needle));
 }
 
 function headerValue(headers, name) {
@@ -236,18 +262,32 @@ function downloadAttempt(url, tempPath, options) {
 
 async function fetchJson(url, options = {}) {
   const headers = { "User-Agent": USER_AGENT, ...(options.headers || {}) };
-  const response = await net.fetch(url, {
-    method: "GET",
-    headers,
-    useSessionCookies: false,
-  });
-  if (!response.ok) {
-    const err = new Error(`HTTP ${response.status} fetching ${url}`);
-    err.isHttpError = true;
-    err.statusCode = response.status;
-    throw err;
+  const fetchOnce = async (u) => {
+    const response = await net.fetch(u, {
+      method: "GET",
+      headers,
+      useSessionCookies: false,
+    });
+    if (!response.ok) {
+      const err = new Error(`HTTP ${response.status} fetching ${u}`);
+      err.isHttpError = true;
+      err.statusCode = response.status;
+      throw err;
+    }
+    return response.json();
+  };
+  try {
+    return await fetchOnce(url);
+  } catch (error) {
+    // On a network-level failure, retry once through the configured mirror
+    // (relevant for api.github.com, which is unreachable on some networks).
+    const candidates = variantsFor(url);
+    if (candidates.length > 1 && candidates[1] !== url && !error.isHttpError) {
+      debugLogger.info("Retrying JSON fetch via mirror", { url: candidates[1] });
+      return fetchOnce(candidates[1]);
+    }
+    throw error;
   }
-  return response.json();
 }
 
 async function downloadFile(url, destPath, options = {}) {
@@ -269,6 +309,9 @@ async function downloadFile(url, destPath, options = {}) {
   }
 
   let lastError = null;
+  // Rotate through the original URL plus any configured mirrors on retries, so
+  // a blocked origin (e.g. huggingface.co from some networks) is bypassed.
+  const urlCandidates = variantsFor(url);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (signal?.aborted) {
@@ -277,7 +320,14 @@ async function downloadFile(url, destPath, options = {}) {
 
     if (attempt > 0) {
       const delay = backoffDelay(attempt - 1);
-      debugLogger.info("Retrying download", { attempt, delay, startOffset });
+      const attemptUrl = urlCandidates[attempt % urlCandidates.length];
+      debugLogger.info("Retrying download", {
+        attempt,
+        delay,
+        startOffset,
+        url: attemptUrl,
+        switchedMirror: attemptUrl !== url,
+      });
       await sleep(delay);
 
       // Update startOffset from temp file in case partial data was written
@@ -289,8 +339,10 @@ async function downloadFile(url, destPath, options = {}) {
       }
     }
 
+    const attemptUrl = urlCandidates[attempt % urlCandidates.length];
+
     try {
-      await downloadAttempt(url, tempPath, {
+      await downloadAttempt(attemptUrl, tempPath, {
         onProgress,
         signal,
         startOffset,

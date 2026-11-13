@@ -2,6 +2,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { variantsFor } = require("../../src/helpers/mirror-utils");
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRIES = 3;
@@ -16,6 +17,23 @@ const IDLE_TIMEOUT = 60000; // abort + retry if no new bytes for this long
  * @returns {Promise<object>} - Parsed JSON response
  */
 function fetchJson(url, redirectCount = 0) {
+  return fetchJsonOnce(url, redirectCount).catch(async (error) => {
+    // On a network-level failure, retry once through the configured mirror
+    // (relevant for api.github.com, which is unreachable on some networks).
+    if (redirectCount === 0) {
+      const candidates = variantsFor(url);
+      if (candidates.length > 1 && candidates[1] !== url) {
+        console.log(
+          `  Failed to fetch ${url} (${error.message}); retrying via mirror: ${candidates[1]}`
+        );
+        return fetchJsonOnce(candidates[1], 0);
+      }
+    }
+    throw error;
+  });
+}
+
+function fetchJsonOnce(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > MAX_REDIRECTS) {
       reject(new Error("Too many redirects"));
@@ -259,12 +277,19 @@ function downloadFile(url, dest, retryCount = 0) {
       error.code === "ETIMEDOUT";
 
     if (isTransient && retryCount < MAX_RETRIES) {
+      // Rotate through the original URL plus any configured mirrors, so a
+      // blocked origin is bypassed on the next attempt.
+      const candidates = variantsFor(url);
+      const nextUrl = candidates[retryCount % candidates.length];
       console.log(`\n  Retry ${retryCount + 1}/${MAX_RETRIES}: ${error.message}`);
+      if (nextUrl !== url) {
+        console.log(`  Switching to mirror: ${nextUrl}`);
+      }
       await sleep(RETRY_DELAY);
       if (fs.existsSync(dest)) {
         fs.unlinkSync(dest);
       }
-      return downloadFile(url, dest, retryCount + 1);
+      return downloadFile(nextUrl, dest, retryCount + 1);
     }
     throw error;
   });

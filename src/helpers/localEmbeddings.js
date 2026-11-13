@@ -105,7 +105,12 @@ class LocalEmbeddings {
     for (const file of files) {
       const dest = path.join(this.modelDir, file.name);
       if (fs.existsSync(dest)) continue;
-      debugLogger.debug("local-embeddings downloading", { file: file.name });
+      debugLogger.debug("local-embeddings downloading", {
+        file: file.name,
+        // downloadFile rotates through the original + configured mirrors
+        // (SUPERTING_HF_MIRROR / SUPERTING_GITHUB_MIRROR) on retries.
+        candidates: require("./mirror-utils").variantsFor(file.url).length,
+      });
       await downloadFile(file.url, dest);
     }
 
