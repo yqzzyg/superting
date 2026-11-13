@@ -44,7 +44,11 @@ export const useAudioRecording = (toast, options = {}) => {
         if (getSettings().pauseMediaOnDictation) {
           window.electronAPI?.pauseMediaPlayback?.();
         }
-        window.electronAPI?.registerCancelHotkey?.("Escape");
+        // ESC is intentionally NOT registered as a global cancel hotkey: it is a
+        // system-level accelerator that hijacks Escape in every other app while
+        // recording. Cancellation is available via the overlay's cancel button
+        // (and the overlay's own keydown ESC when the window is focused).
+        // window.electronAPI?.registerCancelHotkey?.("Escape");
 
         void playStartCue();
       }
